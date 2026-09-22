@@ -1,3 +1,4 @@
+
 import os
 import glob
 import datetime as dt
@@ -11,6 +12,17 @@ try:
     import joblib
 except Exception:  # pragma: no cover
     joblib = None
+
+
+TEXT_DARK = "#10182c"
+CHART_LAYOUT_BASE = dict(
+    plot_bgcolor="white",
+    paper_bgcolor="white",
+    font=dict(color=TEXT_DARK),
+    xaxis=dict(color=TEXT_DARK, gridcolor="#e5e9f2", title_font=dict(color=TEXT_DARK)),
+    yaxis=dict(color=TEXT_DARK, gridcolor="#e5e9f2", title_font=dict(color=TEXT_DARK)),
+    legend=dict(font=dict(color=TEXT_DARK)),
+)
 
 # --------------------------------------------------------------------------
 # PAGE CONFIG
@@ -83,36 +95,44 @@ st.markdown(
     }
     .hero-title { font-size: 28px; font-weight: 800; margin: 0; }
     .hero-sub { opacity: 0.85; margin-top: 4px; font-size: 14px; }
+    /* Every card below sets its own text color explicitly (with !important)
+       so nothing goes white-on-white or white-on-light when the app is
+       viewed under a dark browser/OS theme after deployment. */
     .kpi-card, .panel-card {
-        background: white; border-radius: 14px; padding: 18px 20px;
+        background: white !important; color: #10182c !important;
+        border-radius: 14px; padding: 18px 20px;
         box-shadow: 0 1px 3px rgba(20,30,60,0.08); border: 1px solid #eef1f8;
         margin-bottom: 18px;
     }
-    .kpi-label { color: #6b7484; font-size: 13px; font-weight: 600; }
-    .kpi-value { font-size: 26px; font-weight: 800; color: #10182c; margin: 2px 0; }
-    .kpi-sub { color: #8a93a3; font-size: 12px; }
-    .kpi-up { color: #16a34a; font-weight: 700; font-size: 12px; }
-    .kpi-down { color: #dc2626; font-weight: 700; font-size: 12px; }
-    .panel-title { font-size: 16px; font-weight: 800; color: #10182c; }
-    .panel-sub { color: #8a93a3; font-size: 12.5px; margin-bottom: 10px; }
+    .kpi-card table, .panel-card table { color: #10182c !important; width: 100%; }
+    .kpi-card td, .panel-card td, .kpi-card th, .panel-card th { color: #10182c !important; }
+    .kpi-label { color: #6b7484 !important; font-size: 13px; font-weight: 600; }
+    .kpi-value { font-size: 26px; font-weight: 800; color: #10182c !important; margin: 2px 0; }
+    .kpi-sub { color: #8a93a3 !important; font-size: 12px; }
+    .kpi-up { color: #16a34a !important; font-weight: 700; font-size: 12px; }
+    .kpi-down { color: #dc2626 !important; font-weight: 700; font-size: 12px; }
+    .panel-title { font-size: 16px; font-weight: 800; color: #10182c !important; }
+    .panel-sub { color: #8a93a3 !important; font-size: 12.5px; margin-bottom: 10px; }
     .status-pill {
         display:inline-block; padding:3px 10px; border-radius:20px;
-        background:#e8f9ee; color:#159654; font-size:12px; font-weight:700;
+        background:#e8f9ee !important; color:#159654 !important; font-size:12px; font-weight:700;
     }
     .cat-box {
-        border-radius: 10px; padding: 14px; color: white; font-weight: 700;
+        border-radius: 10px; padding: 14px; color: white !important; font-weight: 700;
         margin-bottom: 10px;
     }
     .alert-box {
-        background:#fff4e0; border:1px solid #ffe0a3; border-radius:12px;
-        padding:14px 16px; margin-bottom: 14px;
+        background:#fff4e0 !important; color:#7a4a00 !important; border:1px solid #ffe0a3;
+        border-radius:12px; padding:14px 16px; margin-bottom: 14px;
     }
+    .alert-box b { color:#7a4a00 !important; }
     .info-box {
-        background:#eaf3ff; border:1px solid #cfe4ff; border-radius:12px;
-        padding:14px 16px;
+        background:#eaf3ff !important; color:#0b3d8a !important; border:1px solid #cfe4ff;
+        border-radius:12px; padding:14px 16px;
     }
+    .info-box b { color:#0b3d8a !important; }
     .ai-box {
-        background:#0b1730; color:#e7ecf7; border-radius:14px;
+        background:#0b1730 !important; color:#e7ecf7 !important; border-radius:14px;
         padding:20px 22px; margin-top:6px;
     }
     .ai-box b { color:#7dd3fc; }
@@ -123,7 +143,7 @@ st.markdown(
 )
 
 # --------------------------------------------------------------------------
-# DATA LOADING
+# DATA LOADING (robust — file missing/mismatched ho to bhi crash nahi hoga)
 # --------------------------------------------------------------------------
 def _synth_unit(unit_id: int, n_cycles: int, seed: int) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
@@ -350,7 +370,7 @@ with st.sidebar:
     st.caption(f"Last updated: {dt.datetime.now().strftime('%H:%M:%S')}")
 
 # --------------------------------------------------------------------------
-# SHARED COMPUTATIONS (selected engine/dataset ke hisaab se, sab pages me use)
+# SHARED COMPUTATIONS 
 # --------------------------------------------------------------------------
 engine_df = df[df["unit"] == engine_id].reset_index(drop=True) if "unit" in df else df
 if engine_df.empty:
@@ -479,9 +499,9 @@ if page == "🏠 Dashboard":
                 line=dict(color=color, width=2), customdata=raw,
                 hovertemplate=f"{label}: %{{customdata:,.2f}} {unit_}<br>Cycle: %{{x}}<extra></extra>",
             ))
-        fig.update_layout(height=380, margin=dict(l=10, r=10, t=10, b=10),
-                           plot_bgcolor="white", paper_bgcolor="white",
-                           legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        fig.update_layout(**CHART_LAYOUT_BASE, height=380, margin=dict(l=10, r=10, t=10, b=10),
+                           legend=dict(font=dict(color=TEXT_DARK), orientation="h",
+                                       yanchor="bottom", y=1.02, xanchor="right", x=1),
                            xaxis_title="Engine Cycle", yaxis_title="Normalized value (hover for real reading)")
         st.plotly_chart(fig, use_container_width=True, key="dash_trend_chart")
         if flat_sensors:
@@ -527,10 +547,13 @@ if page == "🏠 Dashboard":
 
     with c4:
         gauge = go.Figure(go.Indicator(
-            mode="gauge+number", value=rul_pred, number={"suffix": " cyc", "font": {"size": 26}},
-            gauge={"axis": {"range": [0, max(200, rul_pred * 1.2)]}, "bar": {"color": health_color},
-                   "bgcolor": "#eef1f8"}, domain={"x": [0, 1], "y": [0, 1]}))
-        gauge.update_layout(height=230, margin=dict(l=10, r=10, t=30, b=0))
+            mode="gauge+number", value=rul_pred,
+            number={"suffix": " cyc", "font": {"size": 26, "color": TEXT_DARK}},
+            gauge={"axis": {"range": [0, max(200, rul_pred * 1.2)], "tickcolor": TEXT_DARK},
+                   "bar": {"color": health_color}, "bgcolor": "#eef1f8"},
+            domain={"x": [0, 1], "y": [0, 1]}))
+        gauge.update_layout(height=230, margin=dict(l=10, r=10, t=30, b=0),
+                             paper_bgcolor="white", font=dict(color=TEXT_DARK))
         st.markdown('<div class="panel-card"><div class="panel-title">❤️ Engine Health Status</div></div>', unsafe_allow_html=True)
         st.plotly_chart(gauge, use_container_width=True, key="dash_gauge_chart")
         st.markdown(
@@ -571,8 +594,12 @@ if page == "🏠 Dashboard":
         radar.add_trace(go.Scatterpolar(r=current_vals + [current_vals[0]], theta=radar_labels + [radar_labels[0]],
                                          name="Current", line=dict(color="#2563eb")))
         radar.update_layout(height=300, margin=dict(l=20, r=20, t=10, b=10),
-                             polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-                             showlegend=True, legend=dict(orientation="h", y=-0.1))
+                             paper_bgcolor="white", font=dict(color=TEXT_DARK),
+                             polar=dict(bgcolor="white",
+                                        radialaxis=dict(visible=True, range=[0, 100], color=TEXT_DARK,
+                                                         gridcolor="#e5e9f2"),
+                                        angularaxis=dict(color=TEXT_DARK)),
+                             showlegend=True, legend=dict(font=dict(color=TEXT_DARK), orientation="h", y=-0.1))
         st.plotly_chart(radar, use_container_width=True, key="dash_radar_chart")
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -628,8 +655,7 @@ elif page == "📈 Engine Monitoring":
     fig1.add_trace(go.Scatter(x=engine_df["cycle"], y=series, mode="lines",
                                line=dict(color="#2563eb", width=2), fill="tozeroy",
                                fillcolor="rgba(37,99,235,0.08)"))
-    fig1.update_layout(height=340, margin=dict(l=10, r=10, t=10, b=10),
-                        plot_bgcolor="white", paper_bgcolor="white",
+    fig1.update_layout(**CHART_LAYOUT_BASE, height=340, margin=dict(l=10, r=10, t=10, b=10),
                         xaxis_title="Engine Cycle", yaxis_title=SENSOR_LABELS.get(chosen_sensor, chosen_sensor))
     st.plotly_chart(fig1, use_container_width=True, key="mon_single_sensor_chart")
 
@@ -650,10 +676,10 @@ elif page == "📈 Engine Monitoring":
             vals = engine_df[s]
             norm = (vals - vals.min()) / max(vals.max() - vals.min(), 1e-9)
             fig2.add_trace(go.Scatter(x=engine_df["cycle"], y=norm, name=SENSOR_LABELS.get(s, s)))
-        fig2.update_layout(height=340, margin=dict(l=10, r=10, t=10, b=10),
-                            plot_bgcolor="white", paper_bgcolor="white",
+        fig2.update_layout(**CHART_LAYOUT_BASE, height=340, margin=dict(l=10, r=10, t=10, b=10),
                             xaxis_title="Engine Cycle", yaxis_title="Normalized value",
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+                            legend=dict(font=dict(color=TEXT_DARK), orientation="h",
+                                        yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig2, use_container_width=True, key="mon_multi_sensor_chart")
     else:
         st.info("Compare karne ke liye upar se kam-se-kam ek sensor chuno.")
@@ -715,8 +741,7 @@ elif page == "🔧 Maintenance":
                                line=dict(color="#dc2626", width=2), fill="tozeroy",
                                fillcolor="rgba(220,38,38,0.08)"))
     fig3.add_hline(y=30, line_dash="dash", line_color="#f59e0b", annotation_text="Critical threshold")
-    fig3.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10),
-                        plot_bgcolor="white", paper_bgcolor="white",
+    fig3.update_layout(**CHART_LAYOUT_BASE, height=320, margin=dict(l=10, r=10, t=10, b=10),
                         xaxis_title="Engine Cycle", yaxis_title="Predicted RUL")
     st.plotly_chart(fig3, use_container_width=True, key="maint_rul_trend_chart")
 
