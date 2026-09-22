@@ -14,7 +14,7 @@ try:
 except Exception:  # pragma: no cover
     joblib = None
 
-.
+
 TEXT_DARK = "#10182c"
 
 
