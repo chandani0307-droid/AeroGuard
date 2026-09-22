@@ -1,31 +1,4 @@
-"""
-AeroGuard — Aircraft Engine Intelligence Dashboard
-----------------------------------------------------
-A single-file Streamlit dashboard with working sidebar navigation
-(Dashboard / Engine Monitoring / Sensor Data / Maintenance are separate
-pages), KPI cards, sensor trend chart, engine overview, live sensor
-status, health gauge, category-wise distribution (computed live from the
-selected engine/dataset), parameter radar chart, maintenance alerts, and
-an "AI Assistant Recommendation" panel.
 
-Run:
-    pip install -r requirements.txt
-    streamlit run app.py
-
-Expected folder structure (everything below is optional — if a file is
-missing, the app falls back to demo data automatically, it never crashes):
-
-    app.py
-    .streamlit/config.toml
-    gradient_boosting_model.pkl
-    scaler.pkl
-    data/
-        test_FD001.txt   (or .csv)
-        test_FD002.txt
-        test_FD003.txt
-        test_FD004.txt
-
-"""
 
 import os
 import glob
@@ -41,9 +14,7 @@ try:
 except Exception:  # pragma: no cover
     joblib = None
 
-# Dark, readable text color used on every white/light card and every chart,
-# forced explicitly everywhere so nothing renders invisible on a different
-# viewer theme or when the app is deployed.
+.
 TEXT_DARK = "#10182c"
 
 
@@ -181,7 +152,7 @@ st.markdown(
 )
 
 # --------------------------------------------------------------------------
-# DATA LOADING (robust — never crashes even if files are missing or mismatched)
+# DATA LOADING 
 # --------------------------------------------------------------------------
 def _synth_unit(unit_id: int, n_cycles: int, seed: int) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
