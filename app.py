@@ -1,79 +1,76 @@
-
-
 import os
 import glob
 import datetime as dt
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 
 try:
     import joblib
-except Exception:
+except Exception:  # pragma: no cover
     joblib = None
 
-
-# DATA LOADING
+# --------------------------------------------------------------------------
+# PAGE CONFIG
+# --------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Aero Data Analysis",
-    page_icon="✈️",
+    page_title="AeroGuard | Aircraft Engine Intelligence",
+    page_icon="🛩️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
 MODEL_PATH = os.path.join(BASE_DIR, "gradient_boosting_model.pkl")
 SCALER_PATH = os.path.join(BASE_DIR, "scaler.pkl")
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 COLS = (
-    ["unit","cycle","op1","op2","op3"]
+    ["unit", "cycle", "op1", "op2", "op3"]
     + [f"sensor_{i}" for i in range(1, 22)]
 )
 
 SENSOR_LABELS = {
-     "sensor_1": "Fan Inlet Temp", "sensor_2": "LPC Temperature",
-        "sensor_3": "HPC Temperature", "sensor_4": "LPT Temperature",
-        "sensor_5": "Fan Inlet Pressure", "sensor_6": "Bypass-Duct Pressure",
-        "sensor_7": "HPC Pressure", "sensor_8": "Physical Fan Speed",
-        "sensor_9": "Physical Core Speed", "sensor_10": "Engine Pressure Ratio",
-        "sensor_11": "Static HPC Pressure", "sensor_12": "Fuel Flow Ratio",
-        "sensor_13": "Corr. Fan Speed", "sensor_14": "Corr. Core Speed",
-        "sensor_15": "Bypass Ratio", "sensor_16": "Burner Fuel-Air Ratio",
-        "sensor_17": "Bleed Enthalpy", "sensor_18": "Demanded Fan Speed",
-        "sensor_19": "Demanded Corr. Fan Speed", "sensor_20": "HPT Coolant Bleed",
-        "sensor_21": "LPT Coolant Bleed",
+    "sensor_1": "Fan Inlet Temp", "sensor_2": "LPC Temperature",
+    "sensor_3": "HPC Temperature", "sensor_4": "LPT Temperature",
+    "sensor_5": "Fan Inlet Pressure", "sensor_6": "Bypass-Duct Pressure",
+    "sensor_7": "HPC Pressure", "sensor_8": "Physical Fan Speed",
+    "sensor_9": "Physical Core Speed", "sensor_10": "Engine Pressure Ratio",
+    "sensor_11": "Static HPC Pressure", "sensor_12": "Fuel Flow Ratio",
+    "sensor_13": "Corr. Fan Speed", "sensor_14": "Corr. Core Speed",
+    "sensor_15": "Bypass Ratio", "sensor_16": "Burner Fuel-Air Ratio",
+    "sensor_17": "Bleed Enthalpy", "sensor_18": "Demanded Fan Speed",
+    "sensor_19": "Demanded Corr. Fan Speed", "sensor_20": "HPT Coolant Bleed",
+    "sensor_21": "LPT Coolant Bleed",
 }
 
 CATEGORY_MAP = {
-      "Temperature": ["sensor_2", "sensor_3", "sensor_4"],
-       "Pressure": ["sensor_7", "sensor_11"],
-       "Rotational Speed": ["sensor_9", "sensor_13", "sensor_14"],
-       "Vibration": ["sensor_1", "sensor_5"],
-       "Fuel": ["sensor_12"],
-       "Oil": ["sensor_6", "sensor_20", "sensor_21"],
-       "Electrical": ["sensor_15", "sensor_17"],
-       "Other": ["sensor_8", "sensor_10", "sensor_16", "sensor_18", "sensor_19"],
-   }
-
+    "Temperature": ["sensor_2", "sensor_3", "sensor_4"],
+    "Pressure": ["sensor_7", "sensor_11"],
+    "Rotational Speed": ["sensor_9", "sensor_13", "sensor_14"],
+    "Vibration": ["sensor_1", "sensor_5"],
+    "Fuel": ["sensor_12"],
+    "Oil": ["sensor_6", "sensor_20", "sensor_21"],
+    "Electrical": ["sensor_15", "sensor_17"],
+    "Other": ["sensor_8", "sensor_10", "sensor_16", "sensor_18", "sensor_19"],
+}
 CATEGORY_COLORS = {
     "Temperature": "#2563eb", "Pressure": "#16a34a", "Rotational Speed": "#f59e0b",
     "Vibration": "#7c3aed", "Fuel": "#ef4444", "Oil": "#0d9488",
     "Electrical": "#eab308", "Other": "#64748b",
 }
 
-#Custom CSS for Streamlit
-
+# --------------------------------------------------------------------------
+# CUSTOM CSS
+# --------------------------------------------------------------------------
 st.markdown(
     """
     <style>
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-   # header {visibility: hidden;}
+    header {visibility: hidden;}
     .stApp { background-color: #f4f6fb; }
     section[data-testid="stSidebar"] { background-color: #0b1730; }
     section[data-testid="stSidebar"] * { color: #e7ecf7 !important; }
@@ -125,13 +122,14 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Data Loading
-
+# --------------------------------------------------------------------------
+# DATA LOADING
+# --------------------------------------------------------------------------
 def _synth_unit(unit_id: int, n_cycles: int, seed: int) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     cycles = np.arange(1, n_cycles + 1)
     drift = cycles / n_cycles
-    scale = rng.uniform(0.88, 1.18)         
+    scale = rng.uniform(0.88, 1.18)          # har engine thoda alag baseline
     noise_level = rng.uniform(0.7, 1.4)
 
     data = {"unit": unit_id, "cycle": cycles, "op1": 0.0, "op2": 0.0, "op3": 100.0}
@@ -150,6 +148,7 @@ def _synth_unit(unit_id: int, n_cycles: int, seed: int) -> pd.DataFrame:
         noise = rng.normal(0, spread * 0.15 * noise_level, n_cycles)
         data[key] = base * scale + drift * spread * 2 * scale + noise
     return pd.DataFrame(data)
+
 
 @st.cache_data(show_spinner=False)
 def generate_demo_data(fd_choice: str, n_units: int = 8) -> pd.DataFrame:
@@ -171,7 +170,6 @@ def load_dataset(fd_choice: str) -> pd.DataFrame:
         f"*{fd_choice}*descriptive*", f"*{fd_choice}*.txt", f"*{fd_choice}*.csv",
     ]
     found = None
-
     if os.path.isdir(DATA_DIR):
         for pat in patterns:
             matches = glob.glob(os.path.join(DATA_DIR, pat))
@@ -179,7 +177,6 @@ def load_dataset(fd_choice: str) -> pd.DataFrame:
                 found = matches[0]
                 break
 
-            
     if found:
         try:
             if found.endswith(".csv"):
@@ -217,6 +214,7 @@ def load_model_and_scaler():
             scaler = None
     return model, scaler
 
+
 def predict_rul_batch(model, scaler, frame: pd.DataFrame):
     """Vectorized RUL prediction for every row in `frame`."""
     feature_cols = [c for c in frame.columns if c not in ("unit", "cycle")]
@@ -249,7 +247,7 @@ def predict_rul_row(model, scaler, row: pd.Series):
 
 
 def ai_recommendation(rul_pred, health_label, hpc_change, risk_label, cycle_now):
-    if rul_pred < 50:
+    if rul_pred < 30:
         headline = "⚠️ Immediate inspection recommended"
         tips = [
             f"Predicted RUL has dropped to ~{rul_pred:,.0f} cycles — schedule a borescope "
@@ -257,7 +255,7 @@ def ai_recommendation(rul_pred, health_label, hpc_change, risk_label, cycle_now)
             "Compare current HPC/LPC temperature trend against past failure signatures for this engine family.",
             "Flag spare-parts and downtime planning given the high-risk status.",
         ]
-    elif rul_pred < 100:
+    elif rul_pred < 80:
         headline = "🟡 Plan maintenance in the near term"
         tips = [
             f"RUL is moderate (~{rul_pred:,.0f} cycles) — slot this engine into the next scheduled maintenance window.",
@@ -314,8 +312,9 @@ def compute_category_shares(engine_df: pd.DataFrame):
     return {cat: round(v / total * 100, 1) for cat, v in scores.items()}
 
 
-# Sidebar
-
+# --------------------------------------------------------------------------
+# SIDEBAR
+# --------------------------------------------------------------------------
 with st.sidebar:
     st.markdown(
         "<div style='display:flex;align-items:center;gap:10px;padding:6px 0 18px 0;'>"
@@ -350,8 +349,9 @@ with st.sidebar:
     st.markdown("🟢 **System Online**")
     st.caption(f"Last updated: {dt.datetime.now().strftime('%H:%M:%S')}")
 
-# SHARED COMPUTATIONS
-
+# --------------------------------------------------------------------------
+# SHARED COMPUTATIONS (selected engine/dataset ke hisaab se, sab pages me use)
+# --------------------------------------------------------------------------
 engine_df = df[df["unit"] == engine_id].reset_index(drop=True) if "unit" in df else df
 if engine_df.empty:
     engine_df = df
@@ -375,16 +375,18 @@ cycle_now = int(latest["cycle"]) if "cycle" in latest else len(engine_df)
 hpc_change = (hpc_temp - float(prev[hpc_col])) / max(abs(float(prev[hpc_col])), 1e-6) * 100
 cycle_change = (cycle_now - int(prev["cycle"])) / max(cycle_now, 1) * 100 if "cycle" in prev else 0.0
 
-if rul_pred < 50:
+if rul_pred < 30:
     health_label, health_color, risk_label = "Critical", "#dc2626", "High Risk"
-elif rul_pred < 100:
+elif rul_pred < 80:
     health_label, health_color, risk_label = "Fair", "#d97706", "Moderate"
 else:
     health_label, health_color, risk_label = "Healthy", "#16a34a", "Low Risk"
 
 category_shares = compute_category_shares(engine_df)
 
-# HERO BANNER 
+# --------------------------------------------------------------------------
+# HERO BANNER (har page ke top par)
+# --------------------------------------------------------------------------
 page_titles = {
     "🏠 Dashboard": ("Aircraft Engine Monitoring Center", "Real-time sensor monitoring and predictive maintenance dashboard"),
     "📈 Engine Monitoring": ("Engine Monitoring", "Deep-dive sensor trends for the selected engine"),
@@ -410,8 +412,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ==========================================================================
 # PAGE 1 — DASHBOARD
-
+# ==========================================================================
 if page == "🏠 Dashboard":
     k1, k2, k3, k4 = st.columns(4)
     with k1:
@@ -576,7 +579,7 @@ if page == "🏠 Dashboard":
     with c7:
         st.markdown('<div class="panel-title">🔧 Maintenance Intelligence</div>', unsafe_allow_html=True)
         st.markdown('<div class="panel-sub">Recommendations based on engine condition.</div>', unsafe_allow_html=True)
-        if rul_pred < 50:
+        if rul_pred < 30:
             st.markdown(
                 f"""<div class="alert-box"><b>⚠️ Maintenance Alert</b><br/>
                 Predicted RUL is only <b>{rul_pred:,.0f} cycles</b>. Schedule an inspection soon.
@@ -594,7 +597,9 @@ if page == "🏠 Dashboard":
     st.markdown("### ")
     render_ai_recommendation_panel(rul_pred, health_label, hpc_change, risk_label, cycle_now)
 
-# Page 2 — Engine Monitoring
+# ==========================================================================
+# PAGE 2 — ENGINE MONITORING
+# ==========================================================================
 elif page == "📈 Engine Monitoring":
     sensor_options = [c for c in engine_df.columns if c.startswith("sensor_")]
     chosen_sensor = st.selectbox(
@@ -651,9 +656,11 @@ elif page == "📈 Engine Monitoring":
                             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig2, use_container_width=True, key="mon_multi_sensor_chart")
     else:
-        st.info("Please select at least one sensor above to compare.")
+        st.info("Compare karne ke liye upar se kam-se-kam ek sensor chuno.")
 
-# Page 3 — Sensor Data
+# ==========================================================================
+# PAGE 3 — SENSOR DATA
+# ==========================================================================
 elif page == "🗄️ Sensor Data":
     st.markdown(
         f"""<div class="panel-card">
@@ -675,7 +682,9 @@ elif page == "🗄️ Sensor Data":
     st.markdown('<div class="panel-title" style="margin-top:18px;">📊 Descriptive statistics</div>', unsafe_allow_html=True)
     st.dataframe(engine_df.describe().T, use_container_width=True)
 
-# Page 4 — Maintenance
+# ==========================================================================
+# PAGE 4 — MAINTENANCE
+# ==========================================================================
 elif page == "🔧 Maintenance":
     m1, m2, m3 = st.columns(3)
     with m1:
@@ -705,13 +714,13 @@ elif page == "🔧 Maintenance":
     fig3.add_trace(go.Scatter(x=engine_df["cycle"], y=rul_series, mode="lines",
                                line=dict(color="#dc2626", width=2), fill="tozeroy",
                                fillcolor="rgba(220,38,38,0.08)"))
-    fig3.add_hline(y=50, line_dash="dash", line_color="#f59e0b", annotation_text="Critical threshold")
+    fig3.add_hline(y=30, line_dash="dash", line_color="#f59e0b", annotation_text="Critical threshold")
     fig3.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10),
                         plot_bgcolor="white", paper_bgcolor="white",
                         xaxis_title="Engine Cycle", yaxis_title="Predicted RUL")
     st.plotly_chart(fig3, use_container_width=True, key="maint_rul_trend_chart")
 
-    if rul_pred < 50:
+    if rul_pred < 30:
         st.markdown(
             f"""<div class="alert-box"><b>⚠️ Maintenance Alert</b><br/>
             Predicted RUL is only <b>{rul_pred:,.0f} cycles</b> for Engine #{int(engine_id):02d}.
